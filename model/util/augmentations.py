@@ -7,3 +7,8 @@ def horisontal_flip(images, targets):
     images = torch.flip(images, [-1])
     targets[:, 2] = 1 - targets[:, 2]
     return images, targets
+
+
+def horisontal_flip_img(images):
+    images = torch.flip(images, [-1])
+    return images

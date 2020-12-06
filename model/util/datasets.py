@@ -276,7 +276,7 @@ class PS_Dataset_C(Dataset):
                  augment=True,
                  multiscale=False,
                  normalized_labels=True):
-        super(PS_Dataset, self).__init__()
+        super(PS_Dataset_C, self).__init__()
         self.sample_names = []
         self.root = folder_path
         self.img_size = img_size
@@ -293,22 +293,14 @@ class PS_Dataset_C(Dataset):
 
     def __getitem__(self, index):
         name = self.sample_names[index]
-        img = self.transform(
-            Image.open(os.path.join(self.root, name + '.jpg')).convert('RGB'))
-        if len(img.shape) != 3:
-            img = img.unsqueeze(0)
-            img = img.expand((3, img.shape[1:]))
-        _, h, w = img.shape
-        h_factor, w_factor = (h, w) if self.normalized_labels else (1, 1)
-        # Pad to square resolution
-        img, pad = pad_to_square(img, 0)
-        _, padded_h, padded_w = img.shape
+        img = cv2.imread(os.path.join(self.root, name + '.jpg'))
 
         # generate points x1,y1,x2,y2
         matfile = sio.loadmat(os.path.join(self.root, name + '.mat'))
         slot = matfile['slots']
         mark = matfile['marks']
-        slot_point = []
+        imgs = []
+        labels = []
 
         for data in slot:
             x1 = mark[int(data[0] - 1)][0]
@@ -316,97 +308,122 @@ class PS_Dataset_C(Dataset):
             x2 = mark[int(data[1] - 1)][0]
             y2 = mark[int(data[1] - 1)][1]
             angle = data[3]
-
-            slot_point.append(np.array([angle_type, x, y, w, h]))
-
-        point_label = torch.cat(
-            (torch.from_numpy(np.array(mark_point, dtype=np.float32)),
-             torch.from_numpy(np.array(slot_point, dtype=np.float32))),
-            dim=0)
-
-        targets = torch.zeros((point_label.shape[0], 6))
-        targets[:, 1:] = point_label
-
-        if self.augment:
-            if np.random.random() < 0.5:
-                img, targets = horisontal_flip(img, targets)
-
-        return img, targets
-
-    def __len__(self):
-        return len(self.sample_names)
-
-    def collate_fn(self, batch):
-        imgs, targets = list(zip(*batch))
-        targets = [boxes for boxes in targets if boxes is not None]
-        for i, boxes in enumerate(targets):
-            boxes[:, 0] = i
-        imgs = torch.stack([resize(img, self.img_size) for img in imgs])
-        targets = torch.cat(targets, 0)
-        return imgs, targets
-
-
-if __name__ == '__main__':
-    root = 'data/testing/outdoor-street light'
-    sample_names = []
-    for file in os.listdir(root):
-        if file.endswith(".mat"):
-            sample_names.append(os.path.splitext(file)[0])
-
-    for index in range(len(sample_names)):
-        name = sample_names[index]
-        print('-------------------------------------------------------')
-        print(os.path.join(root, name + '.jpg'))
-        img = cv2.imread(os.path.join(root, name + '.jpg'))
-
-        # generate points x1,y1,x2,y2
-        matfile = sio.loadmat(os.path.join(root, name + '.mat'))
-        slot = matfile['slots']
-        mark = matfile['marks']
-        mark_point = []
-        slot_point = []
-
-        for i in range(slot.shape[0]):
-            data = slot[i]
-
-            print('mark', mark)
-            print('slot', slot)
-            print('angle', data[3])
-
-            x1 = mark[int(data[0] - 1)][0]
-            y1 = mark[int(data[0] - 1)][1]
-            x2 = mark[int(data[1] - 1)][0]
-            y2 = mark[int(data[1] - 1)][1]
-            angle = data[3]
+            label = torch.from_numpy(np.array([data[2]]))
 
             point1 = np.array([x1, y1])
             point2 = np.array([x2, y2])
-
-            cv2.circle(img, (round(float(x1)), round(float(y1))), 6,
-                       (255, 0, 255), 2, 8)
-            cv2.circle(img, (round(float(x2)), round(float(y2))), 6,
-                       (255, 0, 255), 2, 8)
 
             pts = compute_four_points(angle, point1, point2)
             point3_org = copy.copy(pts[2])
             point4_org = copy.copy(pts[3])
 
             regul_img = image_preprocess(img, pts)
+            regul_img = self.transform(regul_img)
 
-            pts_show = np.array([pts[0], pts[1], point3_org, point4_org],
-                                np.int32)
+            imgs.append(regul_img)
+            labels.append(label)
 
-            cv2.polylines(img, [pts_show], True, (255, 0, 0), 2)
+        return imgs, labels
 
-            cv2.imshow('crop', regul_img)
-            cv2.imshow("Image", img)
-            # if cv2.waitKey(0) & 0xFF == ord('q'):
-            #     break
-            # elif cv2.waitKey(0) & 0xFF == ord('n'):
-            #     continue
-        if cv2.waitKey(0) & 0xFF == ord('q'):
-            break
-        elif cv2.waitKey(0) & 0xFF == ord('n'):
-            continue
+    def __len__(self):
+        return len(self.sample_names)
 
-    cv2.destroyAllWindows()
+    def collate_fn(self, batch):
+        imgs_set, labels_set = list(zip(*batch))
+        images = None
+        targets = None
+        if len(imgs_set) > 0:
+            for imgs in imgs_set:
+                if len(imgs) > 0:
+                    temp = [img for img in imgs]
+                    images = torch.stack(temp)
+        if len(labels_set) > 0:
+            # print('set', labels_set)
+            for labels in labels_set:
+                if len(labels) > 0:
+                    temp = [label for label in labels]
+                    targets = torch.stack(temp)
+        return images, targets
+
+
+if __name__ == '__main__':
+    # root = 'data/testing/outdoor-street light'
+    # sample_names = []
+    # for file in os.listdir(root):
+    #     if file.endswith(".mat"):
+    #         sample_names.append(os.path.splitext(file)[0])
+
+    # for index in range(len(sample_names)):
+    #     name = sample_names[index]
+    #     print('-------------------------------------------------------')
+    #     print(os.path.join(root, name + '.jpg'))
+    #     img = cv2.imread(os.path.join(root, name + '.jpg'))
+
+    #     # generate points x1,y1,x2,y2
+    #     matfile = sio.loadmat(os.path.join(root, name + '.mat'))
+    #     slot = matfile['slots']
+    #     mark = matfile['marks']
+    #     mark_point = []
+    #     slot_point = []
+
+    #     for i in range(slot.shape[0]):
+    #         data = slot[i]
+
+    #         print('mark', mark)
+    #         print('slot', slot)
+    #         print('angle', data[3])
+
+    #         x1 = mark[int(data[0] - 1)][0]
+    #         y1 = mark[int(data[0] - 1)][1]
+    #         x2 = mark[int(data[1] - 1)][0]
+    #         y2 = mark[int(data[1] - 1)][1]
+    #         angle = data[3]
+
+    #         point1 = np.array([x1, y1])
+    #         point2 = np.array([x2, y2])
+
+    #         cv2.circle(img, (round(float(x1)), round(float(y1))), 6,
+    #                    (255, 0, 255), 2, 8)
+    #         cv2.circle(img, (round(float(x2)), round(float(y2))), 6,
+    #                    (255, 0, 255), 2, 8)
+
+    #         pts = compute_four_points(angle, point1, point2)
+    #         point3_org = copy.copy(pts[2])
+    #         point4_org = copy.copy(pts[3])
+
+    #         regul_img = image_preprocess(img, pts)
+
+    #         pts_show = np.array([pts[0], pts[1], point3_org, point4_org],
+    #                             np.int32)
+
+    #         cv2.polylines(img, [pts_show], True, (255, 0, 0), 2)
+
+    #         cv2.imshow('crop', regul_img)
+    #         cv2.imshow("Image", img)
+    #         # if cv2.waitKey(0) & 0xFF == ord('q'):
+    #         #     break
+    #         # elif cv2.waitKey(0) & 0xFF == ord('n'):
+    #         #     continue
+    #     if cv2.waitKey(0) & 0xFF == ord('q'):
+    #         break
+    #     elif cv2.waitKey(0) & 0xFF == ord('n'):
+    #         continue
+
+    # cv2.destroyAllWindows()
+
+    train_dataset = PS_Dataset_C('data/training')
+    train_dataloader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=1,
+        shuffle=True,
+        num_workers=1,
+        pin_memory=True,
+        collate_fn=train_dataset.collate_fn)
+
+    for i, (imgs, targets) in enumerate(train_dataloader):
+        print('index', i)
+        print('imgs', imgs)
+        print('targets', targets)
+        # print(len(imgs))
+        # print(imgs)
+        # print(labels)

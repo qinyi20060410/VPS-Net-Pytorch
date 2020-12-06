@@ -103,6 +103,10 @@ if __name__ == "__main__":
 
     optimizer = torch.optim.Adam(model.parameters())
 
+    lr_scheduler = optim.lr_scheduler.StepLR(optimizer,
+                                             step_size=30,
+                                             gamma=0.1)
+
     metrics = [
         "grid_size",
         "loss",
@@ -125,6 +129,7 @@ if __name__ == "__main__":
     for epoch in range(opt.epochs):
         model.train()
         start_time = time.time()
+        lr_scheduler.step()
         for batch_i, (imgs, targets) in enumerate(train_dataloader):
             batches_done = len(train_dataloader) * epoch + batch_i
 
