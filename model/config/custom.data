@@ -1,0 +1,3 @@
+train=data/training
+test=data/testing/all
+names=data/angle_type.names
