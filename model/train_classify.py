@@ -19,6 +19,7 @@ from evaluate_yolo import evaluate
 from terminaltables import AsciiTable
 
 import time
+import numpy as np
 import datetime
 import argparse
 
@@ -37,7 +38,7 @@ if __name__ == "__main__":
                         help="number of epochs")
     parser.add_argument("--batch_size",
                         type=int,
-                        default=6,
+                        default=64,
                         help="size of each image batch")
     parser.add_argument("--gradient_accumulations",
                         type=int,
@@ -83,31 +84,112 @@ if __name__ == "__main__":
         pin_memory=True,
         collate_fn=train_dataset.collate_fn)
 
+    test_dataset = PS_Dataset_C(test_path)
+    test_dataloader = torch.utils.data.DataLoader(
+        train_dataset,
+        batch_size=opt.batch_size,
+        shuffle=True,
+        num_workers=opt.n_cpu,
+        pin_memory=True,
+        collate_fn=train_dataset.collate_fn)
+
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
     lr_scheduler = optim.lr_scheduler.StepLR(optimizer,
                                              step_size=30,
                                              gamma=0.1)
-    loss_fun = torch.nn.MSELoss()
+    loss_fun = torch.nn.CrossEntropyLoss()
+
+    total_train_steps = 1
+    total_test_steps = 1
+    val_loss = []
+    val_acc = []
+    train_loss = []
+    train_acc = []
+
+    ap = -1
 
     for epoch in range(opt.epochs):
+        lr_scheduler.step()
         model.train()
-        start_time = time.time()
-
+        running_loss = 0.0
+        correct = 0
+        total = 0
+        num = 0
         for batch_i, (imgs, targets) in enumerate(train_dataloader):
+            if imgs is not None and targets is not None:
+                batches_done = len(train_dataloader) * epoch + batch_i
 
-            print('i', batch_i)
-            batches_done = len(train_dataloader) * epoch + batch_i
+                imgs = Variable(imgs.to(device))
+                targets = Variable(targets.to(device))
+                targets = torch.reshape(targets, (-1, ))
 
-            imgs = Variable(imgs.to(device))
-            targets = Variable(targets.to(device))
+                outputs = model(imgs)
+                outputs = torch.reshape(outputs, (-1, 3))
+                loss = loss_fun(outputs, targets)
+                loss.backward()
 
-            outputs = model(imgs)
+                if batches_done % opt.gradient_accumulations:
+                    optimizer.step()
+                    optimizer.zero_grad()
 
-            # print(outputs)
-            print(targets)
+                running_loss += loss.item()
+                _, preds = torch.max(outputs, 1)
+                correct = torch.sum(preds == targets).item()
+                num += correct
+                total += targets.size(0)
 
-            loss = loss_fun(outputs, targets)
+                if total_train_steps % 100 == 0:
+                    print(
+                        'Epoch: {} \tStep: {} \tLoss: {:.6f} \tCorrect: {} \tAll:{}'
+                        .format(epoch + 1, total_train_steps, loss.item(),
+                                correct, targets.size(0)))
 
-            print(loss)
-            print(outputs)
+                total_train_steps += 1
+
+        train_acc.append(num / total)
+        train_loss.append(running_loss / len(train_dataloader))
+        print('train loss: {:.6f}, train acc: {:.6f}'.format(
+            np.mean(train_loss), (num / total)))
+
+        running_loss = 0.0
+        correct = 0
+        total = 0
+        num = 0
+        model.eval()
+        with torch.no_grad():
+            for batch_i, (imgs, targets) in enumerate(test_dataloader):
+                if imgs is not None and targets is not None:
+                    batches_done = len(train_dataloader) * epoch + batch_i
+
+                    imgs = Variable(imgs.to(device))
+                    targets = Variable(targets.to(device))
+                    targets = torch.reshape(targets, (-1, ))
+
+                    outputs = model(imgs)
+                    outputs = torch.reshape(outputs, (-1, 3))
+                    loss = loss_fun(outputs, targets)
+
+                    running_loss += loss.item()
+                    _, preds = torch.max(outputs.data, 1)
+                    correct = torch.sum(preds == targets).item()
+                    num += correct
+                    total += targets.size(0)
+
+                    if total_test_steps % 100 == 0:
+                        print(
+                            'Epoch: {} \tStep: {} \tLoss: {:.6f} \tCorrect: {} \tAll:{}'
+                            .format(epoch + 1, total_test_steps, loss.item(),
+                                    correct, targets.size(0)))
+                    total_test_steps += 1
+
+        val_acc.append(num / total)
+        val_loss.append(running_loss / len(train_dataloader))
+        print('test loss: {:.6f}, test acc: {:.6f}'.format(
+            np.mean(train_loss), (num / total)))
+
+        if (num / total > ap):
+            print(f"save best model params")
+            ap = num / total
+            torch.save(model.state_dict(),
+                       f"checkpoints/classify_ckpt_best.pth")

@@ -8,7 +8,7 @@ import torch.nn.functional as F
 
 
 class Classify_Net(nn.Module):
-    def __init__(self, num_classes=2):
+    def __init__(self, num_classes=3):
         super(Classify_Net, self).__init__()
         self.features = nn.Sequential(
             nn.Conv2d(3, 40, kernel_size=(3, 9), stride=(1, 2)),

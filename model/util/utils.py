@@ -401,10 +401,10 @@ def compute_four_points(angle, point1, point2):
             else:
                 pts = np.array([point1, point2, point3, point4], np.int32)
         if iou_value_real == 21000:
-            print('The whole car is in the verticl parking slot')
+            # print('The whole car is in the verticl parking slot')
             pts = np.array([point1, point2, point3, point4], np.int32)
         if iou_value_ex_real == 21000:
-            print('The whole car is in the verticl parking slot')
+            # print('The whole car is in the verticl parking slot')
             pts = np.array([point1_ex, point2_ex, point3_ex, point4_ex],
                            np.int32)
 
@@ -502,35 +502,43 @@ def fixed_ROI(img, points):
 # Determine the crop region according to four vertices
 def crop_margin(point1, point2, point3, point4):
     if point3[0] < 0:
-        k = (point3[1] - point2[1]) / (point3[0] - point2[0])
+        k = (point3[1] - point2[1]) / (point3[0] - point2[0] +
+                                       0.0000000000000000000000000001)
         point3[0] = 0
         point3[1] = point2[1] - point2[0] * k
     if point4[0] < 0:
-        k = (point4[1] - point1[1]) / (point4[0] - point1[0])
+        k = (point4[1] - point1[1]) / (point4[0] - point1[0] +
+                                       0.0000000000000000000000000001)
         point4[0] = 0
         point4[1] = point1[1] - point1[0] * k
     if point3[0] > 599:
-        k = (point3[1] - point2[1]) / (point3[0] - point2[0])
+        k = (point3[1] - point2[1]) / (point3[0] - point2[0] +
+                                       0.0000000000000000000000000001)
         point3[0] = 599
         point3[1] = point2[1] + (599 - point2[0]) * k
     if point4[0] > 599:
-        k = (point4[1] - point1[1]) / (point4[0] - point1[0])
+        k = (point4[1] - point1[1]) / (point4[0] - point1[0] +
+                                       0.0000000000000000000000000001)
         point4[0] = 599
         point4[1] = point1[1] + (599 - point1[0]) * k
     if point3[1] < 0:
-        k = (point3[1] - point2[1]) / (point3[0] - point2[0])
+        k = (point3[1] - point2[1]) / (point3[0] - point2[0] +
+                                       0.0000000000000000000000000001)
         point3[1] = 0
         point3[0] = point2[0] - point2[1] / k
     if point4[1] < 0:
-        k = (point4[1] - point1[1]) / (point4[0] - point1[0])
+        k = (point4[1] - point1[1]) / (point4[0] - point1[0] +
+                                       0.0000000000000000000000000001)
         point4[1] = 0
         point4[0] = point1[0] - point1[1] / k
     if point3[1] > 599:
-        k = (point3[1] - point2[1]) / (point3[0] - point2[0])
+        k = (point3[1] - point2[1]) / (point3[0] - point2[0] +
+                                       0.0000000000000000000000000001)
         point3[1] = 599
         point3[0] = point2[0] + (599 - point2[1]) / k
     if point4[1] > 599:
-        k = (point4[1] - point1[1]) / (point4[0] - point1[0])
+        k = (point4[1] - point1[1]) / (point4[0] - point1[0] +
+                                       0.0000000000000000000000000001)
         point4[1] = 599
         point4[0] = point1[0] + (599 - point1[1]) / k
     points_roi = np.vstack((point1, point2, point3, point4))

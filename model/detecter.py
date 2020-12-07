@@ -241,10 +241,6 @@ if __name__ == "__main__":
                 point2 = p[1]
                 angle = p[2]
 
-                print(point1)
-                print(type(point1))
-                print(point2)
-
                 cv2.circle(img,
                            (round(float(point1[0])), round(float(point1[1]))),
                            10, (0, 0, 255))
@@ -259,11 +255,8 @@ if __name__ == "__main__":
 
                 regul_img = image_preprocess(img, pts)
 
-                filename = path.split("/")[-1].split(".")[0] + '_' + str(index)
-                label = open(f"output/generate/{filename}.txt", 'w')
-                label.write(str(0))
-                label.close()
-                cv2.imwrite(f"output/generate/{filename}.jpg", regul_img)
+                # filename = path.split("/")[-1].split(".")[0] + '_' + str(index)
+                # cv2.imwrite(f"output/generate/{filename}.jpg", regul_img)
                 # cv2.imshow('crop', regul_img)
                 index = index + 1
 

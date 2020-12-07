@@ -293,6 +293,7 @@ class PS_Dataset_C(Dataset):
 
     def __getitem__(self, index):
         name = self.sample_names[index]
+        # print(name)
         img = cv2.imread(os.path.join(self.root, name + '.jpg'))
 
         # generate points x1,y1,x2,y2
@@ -308,20 +309,23 @@ class PS_Dataset_C(Dataset):
             x2 = mark[int(data[1] - 1)][0]
             y2 = mark[int(data[1] - 1)][1]
             angle = data[3]
-            label = torch.from_numpy(np.array([data[2]]))
 
-            point1 = np.array([x1, y1])
-            point2 = np.array([x2, y2])
+            if data[2] <= 2:
+                label = torch.from_numpy(np.array([data[2]
+                                                   ])).type(torch.LongTensor)
 
-            pts = compute_four_points(angle, point1, point2)
-            point3_org = copy.copy(pts[2])
-            point4_org = copy.copy(pts[3])
+                point1 = np.array([x1, y1])
+                point2 = np.array([x2, y2])
 
-            regul_img = image_preprocess(img, pts)
-            regul_img = self.transform(regul_img)
+                pts = compute_four_points(angle, point1, point2)
+                point3_org = copy.copy(pts[2])
+                point4_org = copy.copy(pts[3])
 
-            imgs.append(regul_img)
-            labels.append(label)
+                regul_img = image_preprocess(img, pts)
+                regul_img = self.transform(regul_img)
+
+                imgs.append(regul_img)
+                labels.append(label)
 
         return imgs, labels
 
@@ -341,89 +345,93 @@ class PS_Dataset_C(Dataset):
             # print('set', labels_set)
             for labels in labels_set:
                 if len(labels) > 0:
-                    temp = [label for label in labels]
-                    targets = torch.stack(temp)
+                    targets = [label for label in labels]
+                    targets = torch.cat(targets, 0)
+                    # targets = torch.stack(temp)
+
         return images, targets
 
 
 if __name__ == '__main__':
-    # root = 'data/testing/outdoor-street light'
-    # sample_names = []
-    # for file in os.listdir(root):
-    #     if file.endswith(".mat"):
-    #         sample_names.append(os.path.splitext(file)[0])
+    root = 'data/training'
+    sample_names = []
+    for file in os.listdir(root):
+        if file.endswith(".mat"):
+            sample_names.append(os.path.splitext(file)[0])
 
-    # for index in range(len(sample_names)):
-    #     name = sample_names[index]
-    #     print('-------------------------------------------------------')
-    #     print(os.path.join(root, name + '.jpg'))
-    #     img = cv2.imread(os.path.join(root, name + '.jpg'))
+    for index in range(len(sample_names)):
+        name = sample_names[index]
+        print('-------------------------------------------------------')
+        print(os.path.join(root, name + '.jpg'))
+        img = cv2.imread(os.path.join(root, name + '.jpg'))
 
-    #     # generate points x1,y1,x2,y2
-    #     matfile = sio.loadmat(os.path.join(root, name + '.mat'))
-    #     slot = matfile['slots']
-    #     mark = matfile['marks']
-    #     mark_point = []
-    #     slot_point = []
+        # generate points x1,y1,x2,y2
+        matfile = sio.loadmat(os.path.join(root, name + '.mat'))
+        slot = matfile['slots']
+        mark = matfile['marks']
+        mark_point = []
+        slot_point = []
 
-    #     for i in range(slot.shape[0]):
-    #         data = slot[i]
+        for i in range(slot.shape[0]):
+            data = slot[i]
 
-    #         print('mark', mark)
-    #         print('slot', slot)
-    #         print('angle', data[3])
+            print('mark', mark)
+            print('slot', slot)
+            print('angle', data[3])
 
-    #         x1 = mark[int(data[0] - 1)][0]
-    #         y1 = mark[int(data[0] - 1)][1]
-    #         x2 = mark[int(data[1] - 1)][0]
-    #         y2 = mark[int(data[1] - 1)][1]
-    #         angle = data[3]
+            if data[2] >= 3:
 
-    #         point1 = np.array([x1, y1])
-    #         point2 = np.array([x2, y2])
+                x1 = mark[int(data[0] - 1)][0]
+                y1 = mark[int(data[0] - 1)][1]
+                x2 = mark[int(data[1] - 1)][0]
+                y2 = mark[int(data[1] - 1)][1]
+                angle = data[3]
 
-    #         cv2.circle(img, (round(float(x1)), round(float(y1))), 6,
-    #                    (255, 0, 255), 2, 8)
-    #         cv2.circle(img, (round(float(x2)), round(float(y2))), 6,
-    #                    (255, 0, 255), 2, 8)
+                point1 = np.array([x1, y1])
+                point2 = np.array([x2, y2])
 
-    #         pts = compute_four_points(angle, point1, point2)
-    #         point3_org = copy.copy(pts[2])
-    #         point4_org = copy.copy(pts[3])
+                cv2.circle(img, (round(float(x1)), round(float(y1))), 6,
+                           (255, 0, 255), 2, 8)
+                cv2.circle(img, (round(float(x2)), round(float(y2))), 6,
+                           (255, 0, 255), 2, 8)
 
-    #         regul_img = image_preprocess(img, pts)
+                pts = compute_four_points(angle, point1, point2)
+                point3_org = copy.copy(pts[2])
+                point4_org = copy.copy(pts[3])
 
-    #         pts_show = np.array([pts[0], pts[1], point3_org, point4_org],
-    #                             np.int32)
+                regul_img = image_preprocess(img, pts)
 
-    #         cv2.polylines(img, [pts_show], True, (255, 0, 0), 2)
+                pts_show = np.array([pts[0], pts[1], point3_org, point4_org],
+                                    np.int32)
 
-    #         cv2.imshow('crop', regul_img)
-    #         cv2.imshow("Image", img)
-    #         # if cv2.waitKey(0) & 0xFF == ord('q'):
-    #         #     break
-    #         # elif cv2.waitKey(0) & 0xFF == ord('n'):
-    #         #     continue
-    #     if cv2.waitKey(0) & 0xFF == ord('q'):
-    #         break
-    #     elif cv2.waitKey(0) & 0xFF == ord('n'):
-    #         continue
+                cv2.polylines(img, [pts_show], True, (255, 0, 0), 2)
 
-    # cv2.destroyAllWindows()
+                cv2.imshow('crop', regul_img)
+                cv2.imshow("Image", img)
+                # if cv2.waitKey(0) & 0xFF == ord('q'):
+                #     break
+                # elif cv2.waitKey(0) & 0xFF == ord('n'):
+                #     continue
+        if cv2.waitKey(0) & 0xFF == ord('q'):
+            break
+        elif cv2.waitKey(0) & 0xFF == ord('n'):
+            continue
 
-    train_dataset = PS_Dataset_C('data/training')
-    train_dataloader = torch.utils.data.DataLoader(
-        train_dataset,
-        batch_size=1,
-        shuffle=True,
-        num_workers=1,
-        pin_memory=True,
-        collate_fn=train_dataset.collate_fn)
+    cv2.destroyAllWindows()
 
-    for i, (imgs, targets) in enumerate(train_dataloader):
-        print('index', i)
-        print('imgs', imgs)
-        print('targets', targets)
-        # print(len(imgs))
-        # print(imgs)
-        # print(labels)
+    # train_dataset = PS_Dataset_C('data/training')
+    # train_dataloader = torch.utils.data.DataLoader(
+    #     train_dataset,
+    #     batch_size=1,
+    #     shuffle=True,
+    #     num_workers=1,
+    #     pin_memory=True,
+    #     collate_fn=train_dataset.collate_fn)
+
+    # for i, (imgs, targets) in enumerate(train_dataloader):
+    #     print('index', i)
+    #     print('imgs', imgs)
+    #     print('targets', targets)
+    # print(len(imgs))
+    # print(imgs)
+    # print(labels)
