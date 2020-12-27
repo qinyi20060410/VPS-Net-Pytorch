@@ -22,6 +22,7 @@ import time
 import datetime
 import argparse
 
+import onnx
 import torch
 from torch.utils.data import DataLoader
 from torchvision import datasets
@@ -125,6 +126,31 @@ if __name__ == "__main__":
     ]
 
     best_ap = -1
+
+    # export
+    dummpy_input = torch.randn(2, 3, 416, 416, device='cuda')
+    input_names = ['inputs']
+    output_names = ['outputs']
+    model.train(False)
+    torch.onnx.export(model,
+                      dummpy_input,
+                      'yolo3.onnx',
+                      verbose=True,
+                      input_names=input_names,
+                      output_names=output_names,
+                      dynamic_axes={
+                          'inputs': {
+                              0: 'batch'
+                          },
+                          'outputs': {
+                              0: 'batch'
+                          }
+                      },
+                      opset_version=11)
+    # test
+    test = onnx.load('yolo3.onnx')
+    onnx.checker.check_model(test)
+    print("==> Passed")
 
     for epoch in range(opt.epochs):
         model.train()

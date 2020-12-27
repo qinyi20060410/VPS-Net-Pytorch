@@ -188,8 +188,7 @@ if __name__ == "__main__":
         print('test loss: {:.6f}, test acc: {:.6f}'.format(
             np.mean(train_loss), (num / total)))
 
-        if (num / total > ap):
-            print(f"save best model params")
-            ap = num / total
-            torch.save(model.state_dict(),
-                       f"checkpoints/classify_ckpt_best.pth")
+        # if (num / total > ap):
+        print(f"save best model params")
+        #     ap = num / total
+        torch.save(model.state_dict(), f"checkpoints/classify_ckpt_best.pth")
